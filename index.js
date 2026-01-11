@@ -63,10 +63,7 @@ const bookRoutes = require('./routes/books');
 const bookBorrowingRoutes = require('./routes/bookBorrowings');
 const coCurricularRoutes = require('./routes/coCurricular');
 const idCardRoutes = require('./routes/idCards');
-<<<<<<< HEAD
-=======
 const houseRoutes = require('./routes/houses');
->>>>>>> aeceb66d2d41b54dcc8dcfc3be7171524459f06c
 
 // Import middleware
 const errorHandler = require('./middleware/errorHandler');

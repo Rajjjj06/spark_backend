@@ -342,7 +342,6 @@ const createStudent = async (req, res) => {
     if (!gender) errors.push('Gender is required');
     if (gender && !['male', 'female', 'other'].includes(gender)) errors.push('Gender must be male, female, or other');
 
-<<<<<<< HEAD
     // Check if email already exists globally (across all schools)
     const existingEmail = await Student.findOne({
       email: email.toLowerCase()
@@ -378,14 +377,12 @@ const createStudent = async (req, res) => {
       return res.status(400).json({
         success: false,
         error: 'A student with this roll number or admission number already exists in your school'
-=======
     if (errors.length > 0) {
       console.log('❌ Validation errors:', errors);
       return res.status(400).json({
         success: false,
         error: 'Validation failed',
         details: errors.map(msg => ({ msg }))
->>>>>>> aeceb66d2d41b54dcc8dcfc3be7171524459f06c
       });
     }
 
@@ -706,14 +703,11 @@ const createStudent = async (req, res) => {
     const createOrLinkParent = async (parentData) => {
       const { email, password, name, contact: phoneNum, relation } = parentData;
       
-<<<<<<< HEAD
-=======
       // Validate parent data
       if (!email || !password || !name) {
         return null; // Skip invalid parent entries
       }
       
->>>>>>> aeceb66d2d41b54dcc8dcfc3be7171524459f06c
       // Check if parent email already exists globally (across all schools)
       const existingParentEmail = await Parent.findOne({ 
         email: email.toLowerCase()
@@ -721,13 +715,10 @@ const createStudent = async (req, res) => {
       
       // Check if parent phone already exists globally (if provided)
       let existingParentPhone = null;
-<<<<<<< HEAD
       if (phone) {
         existingParentPhone = await Parent.findOne({ phone });
-=======
       if (phoneNum) {
         existingParentPhone = await Parent.findOne({ phone: phoneNum });
->>>>>>> aeceb66d2d41b54dcc8dcfc3be7171524459f06c
       }
 
       // If parent exists with same email or phone, link to existing parent
@@ -763,7 +754,6 @@ const createStudent = async (req, res) => {
             throw new Error(`A parent with email ${email} already exists in the system`);
           }
         }
-<<<<<<< HEAD
         if (phone) {
           const phoneExists = await Parent.findOne({ phone });
           if (phoneExists) {
@@ -772,7 +762,6 @@ const createStudent = async (req, res) => {
         }
         
         console.log(`📝 Creating new ${parentType} parent: ${email}`);
-=======
         if (phoneNum) {
           const phoneExists = await Parent.findOne({ phone: phoneNum });
           if (phoneExists) {
@@ -782,7 +771,6 @@ const createStudent = async (req, res) => {
         
         console.log(`📝 Creating new parent: ${email}`);
         const parentTypeValue = relation === 'father' ? 'father' : relation === 'mother' ? 'mother' : 'guardian';
->>>>>>> aeceb66d2d41b54dcc8dcfc3be7171524459f06c
         const newParent = await Parent.create({
           name: name || parentTypeValue.charAt(0).toUpperCase() + parentTypeValue.slice(1),
           email: email.toLowerCase(),
@@ -1057,8 +1045,6 @@ const updateStudent = async (req, res) => {
       }
     }
 
-<<<<<<< HEAD
-=======
     // Handle avatar upload to Cloudinary first if new avatar provided
     let updateData = { ...req.body };
     
@@ -1128,7 +1114,6 @@ const updateStudent = async (req, res) => {
       updateData.isDormitory = true;
     }
 
->>>>>>> aeceb66d2d41b54dcc8dcfc3be7171524459f06c
     // Update student
     const updatedStudent = await Student.findByIdAndUpdate(
       req.params.id,
