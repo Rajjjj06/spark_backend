@@ -26,7 +26,7 @@ const studentSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Roll number is required'],
     trim: true
-    trim: true
+    
     // No default - leave undefined if not provided (sparse index will ignore)
   },
   admissionNumber: {

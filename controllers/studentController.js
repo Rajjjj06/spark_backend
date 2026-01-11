@@ -376,7 +376,8 @@ const createStudent = async (req, res) => {
     if (existingStudent) {
       return res.status(400).json({
         success: false,
-        error: 'A student with this roll number or admission number already exists in your school'
+        error: 'A student with this roll number or admission number already exists in your school'});
+}
     if (errors.length > 0) {
       console.log('❌ Validation errors:', errors);
       return res.status(400).json({
@@ -385,6 +386,7 @@ const createStudent = async (req, res) => {
         details: errors.map(msg => ({ msg }))
       });
     }
+ 
 
     const schoolId = req.user.schoolId;
 
