@@ -7,7 +7,7 @@ const asyncHandler = require('../middleware/asyncHandler');
 // @route   GET /api/fee-collections
 // @access  Private
 exports.getFeeCollections = asyncHandler(async (req, res) => {
-  const { schoolId, studentId, status, academicYear, month, search, page = 1, limit = 50 } = req.query;
+  const { schoolId, studentId, status, academicYear, month, search, classId, page = 1, limit = 50 } = req.query;
   
   // Build query
   let query = {};
@@ -24,7 +24,12 @@ exports.getFeeCollections = asyncHandler(async (req, res) => {
   }
   
   if (status) {
-    query.status = status;
+    // Support 'unpaid' status which includes pending, partial, and overdue
+    if (status === 'unpaid') {
+      query.status = { $in: ['pending', 'partial', 'overdue'] };
+    } else {
+      query.status = status;
+    }
   }
   
   if (academicYear) {
@@ -34,13 +39,68 @@ exports.getFeeCollections = asyncHandler(async (req, res) => {
   if (month) {
     query.month = month;
   }
-  
+
+  // If search is provided, find matching students first
+  let studentIds = null;
   if (search) {
-    // Search in populated fields requires aggregation, for now search by IDs
-    // Could be enhanced with aggregation pipeline
-    query.$or = [
-      { remarks: { $regex: search, $options: 'i' } }
-    ];
+    const school = req.user.role !== 'admin' ? req.user.schoolId : (schoolId || req.user.schoolId);
+    const studentQuery = {
+      schoolId: school,
+      $or: [
+        { name: { $regex: search, $options: 'i' } },
+        { admissionNumber: { $regex: search, $options: 'i' } },
+        { rollNumber: { $regex: search, $options: 'i' } }
+      ]
+    };
+    
+    // If classId is also provided, add it to student query
+    if (classId) {
+      studentQuery.classId = classId;
+    }
+    
+    const matchingStudents = await Student.find(studentQuery).select('_id');
+    studentIds = matchingStudents.map(s => s._id);
+    
+    if (studentIds.length === 0) {
+      // No matching students, return empty result
+      return res.status(200).json({
+        success: true,
+        count: 0,
+        total: 0,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          pages: 0
+        },
+        data: []
+      });
+    }
+    
+    query.student = { $in: studentIds };
+  } else if (classId) {
+    // If only classId is provided (no search), find students in that class
+    const school = req.user.role !== 'admin' ? req.user.schoolId : (schoolId || req.user.schoolId);
+    const studentsInClass = await Student.find({ 
+      schoolId: school,
+      classId: classId 
+    }).select('_id');
+    const studentIdsInClass = studentsInClass.map(s => s._id);
+    
+    if (studentIdsInClass.length === 0) {
+      return res.status(200).json({
+        success: true,
+        count: 0,
+        total: 0,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          pages: 0
+        },
+        data: []
+      });
+    }
+    
+    query.student = { $in: studentIdsInClass };
   }
 
   // Calculate pagination
@@ -53,7 +113,7 @@ exports.getFeeCollections = asyncHandler(async (req, res) => {
     .limit(parseInt(limit))
     .populate({
       path: 'student',
-      select: 'name admissionNumber classId email phone',
+      select: 'name admissionNumber rollNumber classId email phone',
       populate: {
         path: 'classId',
         select: 'name section'
@@ -492,7 +552,7 @@ exports.cancelFeeCollection = asyncHandler(async (req, res) => {
 // @route   GET /api/fee-collections/due/list
 // @access  Private
 exports.getDueCollections = asyncHandler(async (req, res) => {
-  const { academicYear } = req.query;
+  const { academicYear, search, classId } = req.query;
   const school = req.user.role === 'admin' && req.query.schoolId ? req.query.schoolId : req.user.schoolId;
 
   if (!academicYear) {
@@ -502,12 +562,151 @@ exports.getDueCollections = asyncHandler(async (req, res) => {
     });
   }
 
-  const dueCollections = await FeeCollection.getDueCollections(school, academicYear);
+  // Build query for due collections
+  let query = {
+    school: school,
+    academicYear,
+    status: { $in: ['pending', 'partial', 'overdue'] },
+    dueAmount: { $gt: 0 }
+  };
+
+  // If search is provided, find matching students first
+  let studentIds = null;
+  if (search) {
+    const studentQuery = {
+      schoolId: school,
+      $or: [
+        { name: { $regex: search, $options: 'i' } },
+        { admissionNumber: { $regex: search, $options: 'i' } },
+        { rollNumber: { $regex: search, $options: 'i' } }
+      ]
+    };
+    
+    // If classId is also provided, add it to student query
+    if (classId) {
+      studentQuery.classId = classId;
+    }
+    
+    const matchingStudents = await Student.find(studentQuery).select('_id');
+    studentIds = matchingStudents.map(s => s._id);
+    
+    if (studentIds.length === 0) {
+      // No matching students, return empty result
+      return res.status(200).json({
+        success: true,
+        count: 0,
+        data: []
+      });
+    }
+    
+    query.student = { $in: studentIds };
+  } else if (classId) {
+    // If only classId is provided (no search), find students in that class
+    const studentsInClass = await Student.find({ 
+      schoolId: school,
+      classId: classId 
+    }).select('_id');
+    const studentIdsInClass = studentsInClass.map(s => s._id);
+    
+    if (studentIdsInClass.length === 0) {
+      return res.status(200).json({
+        success: true,
+        count: 0,
+        data: []
+      });
+    }
+    
+    query.student = { $in: studentIdsInClass };
+  }
+
+  const dueCollections = await FeeCollection.find(query)
+    .populate({
+      path: 'student',
+      select: 'name admissionNumber rollNumber classId email phone parentPhone parentEmail',
+      populate: {
+        path: 'classId',
+        select: 'name section'
+      }
+    })
+    .populate('feeStructure', 'name amount category frequency type')
+    .sort({ dueDate: 1 });
+
+  // Group dues by student and calculate month periods
+  const now = new Date();
+  const studentDuesMap = new Map();
+
+  dueCollections.forEach(collection => {
+    const studentId = collection.student._id.toString();
+    const dueDate = new Date(collection.dueDate);
+    const monthsOverdue = Math.floor((now - dueDate) / (1000 * 60 * 60 * 24 * 30));
+    
+    if (!studentDuesMap.has(studentId)) {
+      studentDuesMap.set(studentId, {
+        studentId: studentId,
+        studentName: collection.student.name,
+        admissionNumber: collection.student.admissionNumber || collection.student.rollNumber || 'N/A',
+        className: collection.student.classId ? `${collection.student.classId.name}${collection.student.classId.section ? ' - ' + collection.student.classId.section : ''}` : 'N/A',
+        email: collection.student.email,
+        phone: collection.student.phone || collection.student.parentPhone,
+        oneMonthDue: 0,
+        twoMonthDue: 0,
+        threeMonthDue: 0,
+        otherChargesDue: 0,
+        totalDue: 0,
+        lastPaymentDate: collection.payments && collection.payments.length > 0 
+          ? collection.payments[collection.payments.length - 1].paymentDate 
+          : null,
+        paymentHistory: collection.payments ? collection.payments.map(p => ({
+          month: collection.month || 'N/A',
+          amount: p.amount,
+          date: p.paymentDate
+        })) : [],
+        collections: []
+      });
+    }
+
+    const studentDue = studentDuesMap.get(studentId);
+    const dueAmount = collection.dueAmount || 0;
+    
+    // Check if this is an "other charge" (not monthly fee structure)
+    const isOtherCharge = collection.feeStructure && 
+      (collection.feeStructure.type === 'custom' || 
+       collection.feeStructure.frequency === 'one-time' ||
+       !collection.month);
+
+    if (isOtherCharge) {
+      studentDue.otherChargesDue += dueAmount;
+    } else {
+      // Categorize by months overdue
+      if (monthsOverdue >= 3) {
+        studentDue.threeMonthDue += dueAmount;
+      } else if (monthsOverdue === 2) {
+        studentDue.twoMonthDue += dueAmount;
+      } else if (monthsOverdue === 1) {
+        studentDue.oneMonthDue += dueAmount;
+      } else {
+        // Less than 1 month, add to oneMonthDue for visibility
+        studentDue.oneMonthDue += dueAmount;
+      }
+    }
+
+    studentDue.totalDue += dueAmount;
+    studentDue.collections.push({
+      _id: collection._id,
+      month: collection.month,
+      dueAmount: dueAmount,
+      dueDate: collection.dueDate,
+      feeStructure: collection.feeStructure?.name
+    });
+  });
+
+  // Convert map to array
+  const studentDuesList = Array.from(studentDuesMap.values());
 
   res.status(200).json({
     success: true,
-    count: dueCollections.length,
-    data: dueCollections
+    count: studentDuesList.length,
+    data: studentDuesList
   });
 });
 

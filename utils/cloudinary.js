@@ -49,6 +49,19 @@ const inventoryImageStorage = new CloudinaryStorage({
   },
 });
 
+// Configure multer storage for student avatars
+const studentAvatarStorage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: 'school-portal/students/avatars',
+    allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp'],
+    resource_type: 'image',
+    transformation: [
+      { width: 400, height: 400, crop: 'fill', gravity: 'face', quality: 'auto' }
+    ]
+  },
+});
+
 // Configure multer for co-curricular post image uploads
 const coCurricularImageStorage = new CloudinaryStorage({
   cloudinary: cloudinary,
@@ -201,6 +214,25 @@ const uploadDocument = multer({
   }
 });
 
+// Multer upload middleware for syllabus files (PDF, images, videos)
+const uploadSyllabusFiles = multer({
+  storage: documentStorage,
+  limits: {
+    fileSize: 100 * 1024 * 1024, // 100MB limit per file (for videos)
+    files: 10 // Allow up to 10 files
+  },
+  fileFilter: (req, file, cb) => {
+    // Check file type - accept PDF, images, and videos
+    if (file.mimetype === 'application/pdf' || 
+        file.mimetype.startsWith('image/') ||
+        file.mimetype.startsWith('video/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only PDF, image, and video files are allowed'), false);
+    }
+  }
+});
+
 // Utility functions
 const uploadToCloudinary = {
   // Upload photo with custom options
@@ -278,6 +310,34 @@ const uploadToCloudinary = {
       });
     } catch (error) {
       throw new Error(`PDF upload failed: ${error.message}`);
+    }
+  },
+
+  // Upload student avatar from buffer
+  uploadStudentAvatar: async (buffer, studentId, options = {}) => {
+    try {
+      return new Promise((resolve, reject) => {
+        const uploadStream = cloudinary.uploader.upload_stream(
+          {
+            folder: 'school-portal/students/avatars',
+            public_id: `student-${studentId}-${Date.now()}`,
+            resource_type: 'image',
+            transformation: [
+              { width: 400, height: 400, crop: 'fill', gravity: 'face', quality: 'auto' }
+            ],
+            allowed_formats: ['jpg', 'jpeg', 'png', 'gif', 'webp'],
+            timeout: 60000,
+            ...options
+          },
+          (error, result) => {
+            if (error) reject(error);
+            else resolve(result);
+          }
+        );
+        uploadStream.end(buffer);
+      });
+    } catch (error) {
+      throw new Error(`Student avatar upload failed: ${error.message}`);
     }
   },
 
@@ -428,6 +488,8 @@ const handleUploadError = (error, req, res, next) => {
 };
 
 module.exports = {
+  uploadSyllabusFiles,
+  studentAvatarStorage,
   cloudinary,
   uploadPhoto,
   uploadProductImage,
@@ -436,5 +498,7 @@ module.exports = {
   uploadCoCurricularImages,
   uploadToCloudinary,
   uploadInventoryImages,
-  handleUploadError
+  handleUploadError,
+  // Export uploadStudentAvatar directly for easier access
+  uploadStudentAvatar: uploadToCloudinary.uploadStudentAvatar
 };

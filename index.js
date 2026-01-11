@@ -50,6 +50,7 @@ const feeCategoryRoutes = require('./routes/feeCategories');
 const feeStructureRoutes = require('./routes/feeStructures');
 const feeCollectionRoutes = require('./routes/feeCollections');
 const feeReceiptRoutes = require('./routes/feeReceipts');
+const invoiceRoutes = require('./routes/invoices');
 const salaryRoutes = require('./routes/salaries');
 const cartRoutes = require('./routes/cart');
 const orderRoutes = require('./routes/orders');
@@ -62,6 +63,10 @@ const bookRoutes = require('./routes/books');
 const bookBorrowingRoutes = require('./routes/bookBorrowings');
 const coCurricularRoutes = require('./routes/coCurricular');
 const idCardRoutes = require('./routes/idCards');
+<<<<<<< HEAD
+=======
+const houseRoutes = require('./routes/houses');
+>>>>>>> aeceb66d2d41b54dcc8dcfc3be7171524459f06c
 
 // Import middleware
 const errorHandler = require('./middleware/errorHandler');
@@ -102,9 +107,10 @@ const io = new Server(server, {
 
 const PORT = process.env.PORT || 5000;
 
-// Ensure uploads/documents folder exists at startup
+// Ensure uploads directories exist at startup
 const uploadsPath = path.join(__dirname, 'uploads');
 const documentsPath = path.join(__dirname, 'uploads', 'documents');
+const avatarsPath = path.join(__dirname, 'uploads', 'avatars');
 if (!fs.existsSync(uploadsPath)) {
   fs.mkdirSync(uploadsPath, { recursive: true });
   console.log('✅ Created uploads folder');
@@ -112,6 +118,10 @@ if (!fs.existsSync(uploadsPath)) {
 if (!fs.existsSync(documentsPath)) {
   fs.mkdirSync(documentsPath, { recursive: true });
   console.log('✅ Created uploads/documents folder');
+}
+if (!fs.existsSync(avatarsPath)) {
+  fs.mkdirSync(avatarsPath, { recursive: true });
+  console.log('✅ Created uploads/avatars folder');
 }
 
 // Security middleware - Configured for file uploads
@@ -121,8 +131,9 @@ app.use(helmet({
 }));
 app.use(compression());
 
-// Serve static files (uploaded documents)
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// Serve static files (uploaded documents, avatars, etc.)
+const uploadsStaticPath = path.join(__dirname, 'uploads');
+app.use('/uploads', express.static('/var/www/Sparkology/uploads'));
 
 // Rate limiting - DISABLED for file uploads
 // const limiter = rateLimit({
@@ -275,6 +286,7 @@ app.use('/api/fee-categories', feeCategoryRoutes);
 app.use('/api/fee-structures', feeStructureRoutes);
 app.use('/api/fee-collections', feeCollectionRoutes);
 app.use('/api/fee-receipts', feeReceiptRoutes);
+app.use('/api/invoices', invoiceRoutes);
 app.use('/api/salaries', salaryRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/orders', orderRoutes);
@@ -286,6 +298,7 @@ app.use('/api/doubts', doubtRoutes);
 app.use('/api/books', bookRoutes);
 app.use('/api/book-borrowings', bookBorrowingRoutes);
 app.use('/api/co-curricular', coCurricularRoutes);
+app.use('/api/houses', houseRoutes);
 
 // Error handling middleware
 app.use(notFound);
@@ -486,7 +499,7 @@ const startServer = async () => {
   // Try to connect to database (non-blocking)
   connectDB();
   
-  server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Server running on port ${PORT}`);
     console.log(`📊 Environment: ${process.env.NODE_ENV}`);
     console.log(`🌐 Health check: http://localhost:${PORT}/health`);
