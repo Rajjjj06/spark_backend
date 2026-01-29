@@ -342,6 +342,17 @@ const createStudent = async (req, res) => {
     if (!gender) errors.push('Gender is required');
     if (gender && !['male', 'female', 'other'].includes(gender)) errors.push('Gender must be male, female, or other');
 
+    if (errors.length > 0) {
+      console.log('❌ Validation errors:', errors);
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        details: errors.map(msg => ({ msg }))
+      });
+    }
+
+    const schoolId = req.user.schoolId;
+
     // Check if email already exists globally (across all schools)
     const existingEmail = await Student.findOne({
       email: email.toLowerCase()
@@ -376,40 +387,8 @@ const createStudent = async (req, res) => {
     if (existingStudent) {
       return res.status(400).json({
         success: false,
-        error: 'A student with this roll number or admission number already exists in your school'});
-}
-    if (errors.length > 0) {
-      console.log('❌ Validation errors:', errors);
-      return res.status(400).json({
-        success: false,
-        error: 'Validation failed',
-        details: errors.map(msg => ({ msg }))
+        error: 'A student with this roll number or admission number already exists in your school'
       });
-    }
- 
-
-    const schoolId = req.user.schoolId;
-
-    // Check if email already exists globally (across all schools)
-    const existingEmail = await Student.findOne({
-      email: email.toLowerCase()
-    });
-    if (existingEmail) {
-      return res.status(400).json({
-        success: false,
-        error: 'A student with this email already exists in the system'
-      });
-    }
-
-    // Check if phone already exists globally (if provided)
-    if (phone) {
-      const existingPhone = await Student.findOne({ phone });
-      if (existingPhone) {
-        return res.status(400).json({
-          success: false,
-          error: 'A student with this phone number already exists in the system'
-        });
-      }
     }
 
     // Generate or use provided admission number
@@ -719,6 +698,7 @@ const createStudent = async (req, res) => {
       let existingParentPhone = null;
       if (phone) {
         existingParentPhone = await Parent.findOne({ phone });
+      }
       if (phoneNum) {
         existingParentPhone = await Parent.findOne({ phone: phoneNum });
       }
